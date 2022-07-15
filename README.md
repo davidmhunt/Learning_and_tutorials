@@ -1,4 +1,3 @@
-# gnuRadio_tutorials
-Repository for GNU radio tutorials
+## Learning and Tutorials
 
-- Use the script to start GNU radio if needed
+This repository is where I put all of the code that I use for learning new things and taking various tutorials
