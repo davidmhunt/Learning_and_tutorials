@@ -95,7 +95,7 @@ class HardwareTutorial_FM_Receiver_py(gr.top_block, Qt.QWidget):
         self._tuning_win = RangeWidget(self._tuning_range, self.set_tuning, 'Frequency', "counter_slider", float)
         self.top_layout.addWidget(self._tuning_win)
         self.uhd_usrp_source_0 = uhd.usrp_source(
-            ",".join(("", "", "master_clock_rate=200e6")),
+            ",".join(("", "")),
             uhd.stream_args(
                 cpu_format="fc32",
                 args='',
@@ -103,17 +103,17 @@ class HardwareTutorial_FM_Receiver_py(gr.top_block, Qt.QWidget):
             ),
         )
         self.uhd_usrp_source_0.set_center_freq(tuning, 0)
-        self.uhd_usrp_source_0.set_rx_agc(True, 0)
-        self.uhd_usrp_source_0.set_antenna('TX/RX', 0)
+        self.uhd_usrp_source_0.set_rx_agc(False, 0)
+        self.uhd_usrp_source_0.set_gain(50, 0)
+        self.uhd_usrp_source_0.set_antenna('RX2', 0)
         self.uhd_usrp_source_0.set_bandwidth(samp_rate, 0)
-        self.uhd_usrp_source_0.set_clock_rate(200e6, uhd.ALL_MBOARDS)
         self.uhd_usrp_source_0.set_samp_rate(samp_rate)
         # No synchronization enforced.
         self.rational_resampler_xxx_0 = filter.rational_resampler_ccc(
                 interpolation=interp,
                 decimation=rf_decim,
                 taps=None,
-                fractional_bw=0)
+                fractional_bw=0.4)
         self.qtgui_freq_sink_x_0 = qtgui.freq_sink_c(
             1024, #size
             firdes.WIN_BLACKMAN_hARRIS, #wintype
