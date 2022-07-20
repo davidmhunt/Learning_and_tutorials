@@ -1,3 +1,3 @@
 #!/bin/bash
 
-/home/david/uhd/host/build/examples/benchmark_rate --args serial="3231EFC" --duration=1 --rx_subdev "A:A A:B" --tx_subdev "A:A A:B" --rx_stream_args "" --tx_stream_args "" --rx_rate 2000000 --tx_rate 2000000 --rx_spp 1000 --tx_spp 1000 --rx_spb 100 --tx_spb 100 --ref "internal" --random --channels "0,1" --rx_channels "1" --tx_channels "0" --overrun-threshold 1 --underrun-threshold -1 --drop-threshold 100 --seq-threshold 100 
+/home/david/uhd/host/build/examples/benchmark_rate --args serial="3231EFC" --duration=10 --rx_subdev "A:A A:B" --tx_subdev "A:A A:B" --rx_stream_args "" --tx_stream_args "" --rx_rate 15000000 --tx_rate 15000000 --rx_spp 1000 --tx_spp 1000 --rx_spb 1000 --tx_spb 1000 --ref "internal" --channels "0,1" --rx_channels "1" --tx_channels "0" --overrun-threshold 1 --underrun-threshold -1 --drop-threshold 100 --seq-threshold 100 
