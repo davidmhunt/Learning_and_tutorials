@@ -1,0 +1,12 @@
+[
+{
+  "directory": "/Users/David/Documents/Learning_and_tutorials/cpp/JSON Decoding/build",
+  "command": "/usr/bin/clang++ -DJSON_DIAGNOSTICS=0 -DJSON_USE_IMPLICIT_CONVERSIONS=1 -I\"/Users/David/Documents/Learning_and_tutorials/cpp/JSON Decoding/modules\" -isystem /usr/local/include -g -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX12.1.sdk -mmacosx-version-min=11.6 -std=gnu++11 -o CMakeFiles/JSON_Decoding.dir/main.cpp.o -c \"/Users/David/Documents/Learning_and_tutorials/cpp/JSON Decoding/main.cpp\"",
+  "file": "/Users/David/Documents/Learning_and_tutorials/cpp/JSON Decoding/main.cpp"
+},
+{
+  "directory": "/Users/David/Documents/Learning_and_tutorials/cpp/JSON Decoding/build/modules",
+  "command": "/usr/bin/clang++ -DJSON_DIAGNOSTICS=0 -DJSON_USE_IMPLICIT_CONVERSIONS=1 -I\"/Users/David/Documents/Learning_and_tutorials/cpp/JSON Decoding/modules\" -isystem /usr/local/include -g -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX12.1.sdk -mmacosx-version-min=11.6 -std=gnu++11 -o CMakeFiles/modules_lib.dir/get_meta/get_meta_data.cpp.o -c \"/Users/David/Documents/Learning_and_tutorials/cpp/JSON Decoding/modules/get_meta/get_meta_data.cpp\"",
+  "file": "/Users/David/Documents/Learning_and_tutorials/cpp/JSON Decoding/modules/get_meta/get_meta_data.cpp"
+}
+]
