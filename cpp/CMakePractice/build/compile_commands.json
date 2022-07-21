@@ -1,0 +1,12 @@
+[
+{
+  "directory": "/Users/David/Documents/Learning_and_tutorials/cpp/CMakePractice/build/say-hello",
+  "command": "/usr/bin/clang++ -DSAY_HELLO_VERSION=5 -I/Users/David/Documents/Learning_and_tutorials/cpp/CMakePractice/say-hello/src -g -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX12.1.sdk -mmacosx-version-min=11.6 -o CMakeFiles/say-hello.dir/src/say-hello/hello.cpp.o -c /Users/David/Documents/Learning_and_tutorials/cpp/CMakePractice/say-hello/src/say-hello/hello.cpp",
+  "file": "/Users/David/Documents/Learning_and_tutorials/cpp/CMakePractice/say-hello/src/say-hello/hello.cpp"
+},
+{
+  "directory": "/Users/David/Documents/Learning_and_tutorials/cpp/CMakePractice/build/hello-exe",
+  "command": "/usr/bin/clang++ -DSAY_HELLO_VERSION=5 -I/Users/David/Documents/Learning_and_tutorials/cpp/CMakePractice/say-hello/src -g -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX12.1.sdk -mmacosx-version-min=11.6 -o CMakeFiles/cmake-good.dir/main.cpp.o -c /Users/David/Documents/Learning_and_tutorials/cpp/CMakePractice/hello-exe/main.cpp",
+  "file": "/Users/David/Documents/Learning_and_tutorials/cpp/CMakePractice/hello-exe/main.cpp"
+}
+]
