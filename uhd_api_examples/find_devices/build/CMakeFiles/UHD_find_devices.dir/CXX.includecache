@@ -1,0 +1,18 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/david/Documents/Learning_and_tutorials/uhd_api_examples/find_devices/main.cpp
+iostream
+-
+cstdlib
+-
+uhd/types/device_addr.hpp
+/home/david/Documents/Learning_and_tutorials/uhd_api_examples/find_devices/uhd/types/device_addr.hpp
+uhd/device.hpp
+/home/david/Documents/Learning_and_tutorials/uhd_api_examples/find_devices/uhd/device.hpp
+

@@ -1,0 +1,7 @@
+[
+{
+  "directory": "/home/david/Documents/Learning_and_tutorials/uhd_api_examples/find_devices/build",
+  "command": "/usr/bin/g++  -DBOOST_ASIO_DISABLE_STD_EXPERIMENTAL_STRING_VIEW -DBOOST_ASIO_DISABLE_STD_STRING_VIEW -DBOOST_ERROR_CODE_HEADER_ONLY  -g   -std=gnu++11 -o CMakeFiles/UHD_find_devices.dir/main.cpp.o -c /home/david/Documents/Learning_and_tutorials/uhd_api_examples/find_devices/main.cpp",
+  "file": "/home/david/Documents/Learning_and_tutorials/uhd_api_examples/find_devices/main.cpp"
+}
+]

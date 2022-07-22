@@ -1,0 +1,1 @@
+/usr/bin/g++  -g  -rdynamic CMakeFiles/UHD_find_devices.dir/main.cpp.o  -o UHD_find_devices  -Wl,-rpath,/usr/local/lib /usr/local/lib/libuhd.so 
