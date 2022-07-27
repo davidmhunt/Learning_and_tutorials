@@ -1,8 +1,0 @@
-/Users/David/Documents/Learning_and_tutorials/cpp/CMakePractice/build/CMakeFiles/edit_cache.dir
-/Users/David/Documents/Learning_and_tutorials/cpp/CMakePractice/build/CMakeFiles/rebuild_cache.dir
-/Users/David/Documents/Learning_and_tutorials/cpp/CMakePractice/build/say-hello/CMakeFiles/say-hello.dir
-/Users/David/Documents/Learning_and_tutorials/cpp/CMakePractice/build/say-hello/CMakeFiles/edit_cache.dir
-/Users/David/Documents/Learning_and_tutorials/cpp/CMakePractice/build/say-hello/CMakeFiles/rebuild_cache.dir
-/Users/David/Documents/Learning_and_tutorials/cpp/CMakePractice/build/hello-exe/CMakeFiles/cmake-good.dir
-/Users/David/Documents/Learning_and_tutorials/cpp/CMakePractice/build/hello-exe/CMakeFiles/edit_cache.dir
-/Users/David/Documents/Learning_and_tutorials/cpp/CMakePractice/build/hello-exe/CMakeFiles/rebuild_cache.dir

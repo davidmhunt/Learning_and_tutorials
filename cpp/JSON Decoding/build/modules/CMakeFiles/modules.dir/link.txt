@@ -1,2 +1,0 @@
-/usr/bin/ar qc libmodules.a CMakeFiles/modules.dir/get_meta/get_meta_data.cpp.o
-/usr/bin/ranlib libmodules.a
