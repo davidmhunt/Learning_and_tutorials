@@ -112,6 +112,86 @@ int main(void) {
     else{
         std::cout << "Could not open file\n";
     }
+
+    /*
+        CODE for resizinga vector
+    */
+    
+   std::cout << "Resizing a vector\n\n";
+
+    //create a sample chirp
+    size_t samples_per_chirp = 10;
+    std::vector<std::complex<float>> chirp(samples_per_chirp,std::complex<float>(0,0));
+    for (size_t i = 0; i < samples_per_chirp; i++)
+    {
+        chirp[i] = std::complex<float>(static_cast<float>(i) +1,0);
+    }
+    
+    //store the chirp in buffers as big as the largest samples per buffer size
+    size_t samples_per_buff = 5;
+    size_t num_chirps = 2;
+
+    //compute the numer of buffers we need
+    //size_t num_rows; //number of buffers to send
+    size_t excess_samples; //the number of extra samples that will be sent
+
+    if (samples_per_buff == samples_per_chirp){
+        num_rows = num_chirps;
+        excess_samples = 0;
+    }
+    else if (((num_chirps * samples_per_chirp) % samples_per_buff) == 0){
+        num_rows = (num_chirps * samples_per_chirp) / samples_per_buff;
+        excess_samples = 0;   
+    }
+    else
+    {
+        num_rows = ((num_chirps * samples_per_chirp) / samples_per_buff) + 1;
+        excess_samples = (num_rows * samples_per_buff) - (num_chirps * samples_per_chirp);
+    }
+    std::cout << "Num Rows: " << num_rows << " Excess Samples: " << excess_samples << std::endl;
+    
+    //copy the chirp into the buffers
+    std::vector<std::vector<std::complex<float>>> tx_buffer (num_rows,std::vector<std::complex<float>>(samples_per_buff));
+    std::vector<std::complex<float>>::iterator chirp_iterator = chirp.begin();
+    size_t row = 0;
+    std::vector<std::complex<float>>::iterator buffer_iterator = tx_buffer[0].begin();
+    while (buffer_iterator != (tx_buffer[num_rows - 1].end() - excess_samples))
+    {
+        *buffer_iterator = *chirp_iterator;
+
+        //increment chirp iterator
+        if(chirp_iterator == chirp.end() - 1){
+            chirp_iterator = chirp.begin();
+        }
+        else{
+            ++chirp_iterator;
+        }
+
+        //increment buffer iterator
+        if(buffer_iterator == tx_buffer[row].end() - 1){
+            if(row == (num_rows - 1) && excess_samples == 0){
+                buffer_iterator = tx_buffer[row].end();
+            }
+            else{
+                row = row + 1;
+                buffer_iterator = tx_buffer[row].begin();
+            }
+        }
+        else{
+            ++buffer_iterator;
+        }
+    }
+    
+    //Print the tx_buffer
+    for (size_t i = 0; i < num_rows; i++)
+    {
+        for (size_t j = 0; j < tx_buffer[i].size(); j++)
+        {
+            std::cout << tx_buffer[i][j].real() << " + " << tx_buffer[i][j].imag() << "j, ";
+        }
+        std::cout << std::endl;
+    }
+    std::cout << "\n\n";
     
     return EXIT_SUCCESS;
 }
