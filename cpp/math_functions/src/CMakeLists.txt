@@ -1,8 +1,15 @@
 #add subdirectories/dependencies
 find_package(nlohmann_json 3.10.5 REQUIRED)
 
+#enable threads
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
 #declare libraries
 add_library(BufferHandler BufferHandler.cpp)
+
+#add in the sensing subsystem libraries - make sure that buffer handler is built before
+add_subdirectory(sensing_subsystem)
 
 
 #link libraries as needed

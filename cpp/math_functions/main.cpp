@@ -12,17 +12,66 @@
 //including buffer handler
 #include "src/BufferHandler.hpp"
 
-//include the pocketfft computation method
-#include "pocketfft/pocketfft_hdronly.h"
+//include the spectrogram handler
+#include "src/sensing_subsystem/SpectrogramHandler.hpp"
+#include "src/sensing_subsystem/EnergyDetector.hpp"
 
 
 
-using Buffers::Buffer_1D;
-using namespace pocketfft;
+using SpectrogramHandler_namespace::SpectrogramHandler;
+using EnergyDetector_namespace::EnergyDetector;
 using namespace std::chrono;
 
 int main(int, char**) {
     
+    //initialize the spectrogram_handler
+    SpectrogramHandler<float> spectrogram_handler(994,118,64);
+    EnergyDetector<float> energy_detector(5.852e+7,3);
+
+    //load a sample received signal to confirm correctness
+    std::string path = "/home/david/Documents/MATLAB_generated/MATLAB_received_signal.bin";
+    Buffer_2D<std::complex<float>> received_signal;
+    received_signal.set_read_file(path,true);
+    received_signal.import_from_file(2040);
+    received_signal.print_preview();
+    
+    //compute the relative noise power value
+    energy_detector.compute_relative_noise_power(received_signal.buffer[0]);
+    
+    //save the hanning window to a file to confirm correctness
+    path = "/home/david/Documents/MATLAB_generated/cpp_hanning_window.bin";
+    spectrogram_handler.hanning_window.set_write_file(path);
+    spectrogram_handler.hanning_window.save_to_file();
+    
+    //load and reshape the received signal to confirm correctness
+    path = "/home/david/Documents/MATLAB_generated/cpp_reshaped_and_windowed_for_fft.bin";
+    spectrogram_handler.load_and_prepare_for_fft(received_signal.buffer);
+    spectrogram_handler.reshaped__and_windowed_signal_for_fft.set_write_file(path,true);
+    spectrogram_handler.reshaped__and_windowed_signal_for_fft.save_to_file();
+
+    //compute the fft to confirm correctness
+    path = "/home/david/Documents/MATLAB_generated/cpp_generated_spectrogram.bin";
+    spectrogram_handler.compute_ffts();
+    spectrogram_handler.generated_spectrogram.set_write_file(path,true);
+    spectrogram_handler.generated_spectrogram.save_to_file();
+
+    double runs = 100;
+
+    auto start = high_resolution_clock::now();
+    for (double i = 0; i < runs; i++)
+    {
+        spectrogram_handler.load_and_prepare_for_fft(received_signal.buffer);
+        //spectrogram_handler.compute_ffts();
+        //energy_detector.check_for_chirp(received_signal.buffer[1]);
+    }
+
+    auto stop = high_resolution_clock::now();
+    //auto diff = duration_cast<milliseconds>(stop - start);
+    std::chrono::duration<double> diff = stop - start;
+
+    std::cout << "Average time (ms) for " << runs << " runs: " << (diff.count() *1e3)/runs << std::endl;
+
+/*
     // initialize the buffers to load the signal and save the processed signal
     std::string sample_sinusoid_path = "/home/david/Documents/MATLAB_generated/sample_sinusoid.bin";
     Buffer_1D<std::complex<float>> sample_sinusoid;
@@ -42,7 +91,7 @@ int main(int, char**) {
     shape_t axes{0};
 
     //define the number of runs to get an idea of the run time
-    size_t runs = 4000;
+    size_t runs = 1000;
 
     //allocate another two vectors to test multi-threaded support
     std::vector<std::complex<float>> read_buff1 = sample_sinusoid.buffer;
@@ -59,7 +108,7 @@ int main(int, char**) {
         for (size_t i = 0; i < runs/4; i++)
         {
             c2c(shape, stride, stride, axes, FORWARD,
-                read_buff1.data(), write_buff1.data(), 1.f);
+                read_buff1.data(), write_buff1.data(), (float) 1.);
         }
     });
 
@@ -67,7 +116,7 @@ int main(int, char**) {
         for (size_t i = 0; i < runs/4; i++)
         {
             c2c(shape, stride, stride, axes, FORWARD,
-                read_buff2.data(), write_buff2.data(), 1.f);
+                read_buff2.data(), write_buff2.data(), (float) 1.0);
         }
     });
 
@@ -75,14 +124,14 @@ int main(int, char**) {
         for (size_t i = 0; i < runs/4; i++)
         {
             c2c(shape, stride, stride, axes, FORWARD,
-                read_buff3.data(), write_buff3.data(), 1.f);
+                read_buff3.data(), write_buff3.data(), (float) 1.);
         }
     });
 
     for (size_t j = 0; j < runs/4; j++)
     {
         c2c(shape, stride, stride, axes, FORWARD,
-            sample_sinusoid.buffer.data(), computed_fft.buffer.data(), 1.f);
+            sample_sinusoid.buffer.data(), computed_fft.buffer.data(), (float) 1.);
     }
 
     //wait for victim thread to finish
@@ -103,5 +152,6 @@ int main(int, char**) {
     //save the computed fft and save it to the write file
     computed_fft.save_to_file();
 
+*/
     return EXIT_SUCCESS;
 }

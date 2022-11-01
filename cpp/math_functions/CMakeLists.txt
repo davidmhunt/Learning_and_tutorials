@@ -22,12 +22,15 @@ add_executable(math_functions main.cpp)
 #perform linking
 target_link_libraries(math_functions PRIVATE BufferHandler)
 target_link_libraries(math_functions PUBLIC Threads::Threads)
+target_link_libraries(math_functions PRIVATE SpectrogramHandler)
+target_link_libraries(math_functions PRIVATE EnergyDetector)
 
 #include directories
 target_link_directories(math_functions PRIVATE 
                         ${PROJECT_BINARY_DIR}
                         ${PROJECT_BINARY_DIR}/src
-                        ${PROJECT_BINARY_DIR}/pocketfft
+                        ${PROJECT_BINARY_DIR}/src/sensing_subsystem
+                        ${PROJECT_BINARY_DIR}/src/sensing_subsystem/pocketfft
                         )
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
