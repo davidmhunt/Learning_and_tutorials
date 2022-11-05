@@ -51,18 +51,29 @@ int main(int, char**) {
 
     //compute the fft to confirm correctness
     path = "/home/david/Documents/MATLAB_generated/cpp_generated_spectrogram.bin";
-    spectrogram_handler.compute_ffts();
+    spectrogram_handler.compute_ffts_multi_threaded(5);
     spectrogram_handler.generated_spectrogram.set_write_file(path,true);
     spectrogram_handler.generated_spectrogram.save_to_file();
+
+    //detect the points in the spectrogram
+    spectrogram_handler.detect_peaks_in_spectrogram();
+    path = "/home/david/Documents/MATLAB_generated/cpp_spectrogram_point_vals.bin";
+    spectrogram_handler.spectrogram_points_values.set_write_file(path,true);
+    spectrogram_handler.spectrogram_points_values.save_to_file();
+    path = "/home/david/Documents/MATLAB_generated/cpp_spectrogram_point_indicies.bin";
+    spectrogram_handler.spectrogram_points_indicies.set_write_file(path,true);
+    spectrogram_handler.spectrogram_points_indicies.save_to_file();
+
 
     double runs = 100;
 
     auto start = high_resolution_clock::now();
     for (double i = 0; i < runs; i++)
     {
-        spectrogram_handler.load_and_prepare_for_fft(received_signal.buffer);
-        //spectrogram_handler.compute_ffts();
         //energy_detector.check_for_chirp(received_signal.buffer[1]);
+        //spectrogram_handler.load_and_prepare_for_fft(received_signal.buffer);
+        spectrogram_handler.compute_ffts(0);
+        //spectrogram_handler.detect_peaks_in_spectrogram();
     }
 
     auto stop = high_resolution_clock::now();

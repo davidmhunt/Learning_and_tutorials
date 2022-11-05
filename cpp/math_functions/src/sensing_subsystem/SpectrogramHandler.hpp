@@ -39,12 +39,14 @@
             shape_t shape;
             stride_t stride;
             shape_t axes;
+
+            //peak_detection_parameters
+            data_type peak_detection_threshold;
+
         
         public:
 
             //parameters for ffts
-                //reshaped buffer (not for fft)
-                Buffer_2D<std::complex<data_type>> reshaped_signal;
 
                 //reshaped and window buffer (ready for FFT)
                 Buffer_2D<std::complex<data_type>> reshaped__and_windowed_signal_for_fft;
@@ -57,6 +59,10 @@
 
                 //generated spectrogram
                 Buffer_2D<data_type> generated_spectrogram;
+
+                //spectrogram points
+                Buffer_1D<data_type> spectrogram_points_values;
+                Buffer_2D<size_t> spectrogram_points_indicies;
 
             // detected peaks
 
@@ -81,11 +87,13 @@
                 shape({fft_size}),
                 stride({sizeof(std::complex<data_type>)}),
                 axes({0}),
-                reshaped_signal(num_rows,samples_per_sampling_window),
+                peak_detection_threshold(7),
                 reshaped__and_windowed_signal_for_fft(num_rows,fft_size),
                 hanning_window(fft_size),
                 computed_fft(num_rows,fft_size),
-                generated_spectrogram(num_rows,fft_size)
+                generated_spectrogram(num_rows,fft_size),
+                spectrogram_points_values(num_rows),
+                spectrogram_points_indicies(num_rows,2)
                 {
 
                     // initialize the hanning window
@@ -121,17 +129,46 @@
              * 
              * @param received_signal a 2D vector of the received signal recorded on the USRP
              */
+
+
+            /**
+             * @brief Loads a received signal, reshapes, and prepares it 
+             * for fft processing. Signal is saved in 
+             * reshaped__and_windowed_signal_for_fft buffer
+             * 
+             * @param received_signal a 2D vector of the received signal recorded on the USRP
+             */
             void load_and_prepare_for_fft(std::vector<std::vector<std::complex<data_type>>> & received_signal){
                 
-                //reshape the data into individual sampling windows
-                reshaped_signal.load_data_into_buffer_efficient(received_signal,false);
+                //get dimmensions of received_signal array
+                size_t m = received_signal.size(); //rows
+                size_t n = received_signal[0].size(); //cols
+
+                //initialize variables for reshaping
+                size_t from_r;
+                size_t from_c;
+
+                //initialize variable to determine the coordinate in the received signal for a row/col index in reshpaed signal
+                size_t k;
 
                 for (size_t i = 0; i < num_rows; i++)
                 {
                     for (size_t j = 0; j < fft_size; j++)
                     {
-                        reshaped__and_windowed_signal_for_fft.buffer[i][j] = 
-                            reshaped_signal.buffer[i][j] * hanning_window.buffer[j];
+                        //for a given row,col index in the reshaped signal, determine the coordinate in the received_signal
+                        size_t k = i * samples_per_sampling_window + j;
+
+                        //indicies in received_signal
+                        from_r = k/n;
+                        from_c = k % n;
+
+                        if (from_r >= m)
+                        {
+                            reshaped__and_windowed_signal_for_fft.buffer[i][j] = 0;
+                        }
+                        else{
+                            reshaped__and_windowed_signal_for_fft.buffer[i][j] = received_signal[from_r][from_c] * hanning_window.buffer[j];
+                        }
                     } 
                 }
                 return;
@@ -193,6 +230,71 @@
                 for (auto& t : threads){
                     t.join();
                 }
+            }
+        
+            /**
+             * @brief Compute the maximum value and its index in the given signal
+             * 
+             * @param signal the signal to determine the maximum value of
+             * @return std::tuple<data_type,size_t> the maximum value and index of the maximum value in the signal
+             */
+            std::tuple<data_type,size_t> compute_max_val(std::vector<data_type> & signal){
+                //set asside a variable for the value and index of the max value
+                data_type max = signal[0];
+                size_t idx = 0;
+
+                for (size_t i = 0; i < signal.size(); i++)
+                {
+                    if (signal[i] > max)
+                    {
+                        max = signal[i];
+                        idx = i;
+                    }
+                }
+                return std::make_tuple(max,idx);
+            }
+
+            /**
+             * @brief Detect the peaks in the computed spectrogram
+             * 
+             */
+            void detect_peaks_in_spectrogram(){
+                //initialize variable to store results from compute_max_val
+                std::tuple<data_type,size_t> max_val_and_idx;
+                data_type max_val;
+                size_t idx;
+
+                //variable to track the absolute maximum value detected in the spectrogram
+                data_type absolute_max_val = generated_spectrogram.buffer[0][0];
+
+                //get the maximum_value from each computed_spectrogram
+                for (size_t i = 0; i < num_rows; i++)
+                {
+                    max_val_and_idx = compute_max_val(generated_spectrogram.buffer[i]);
+                    max_val = std::get<0>(max_val_and_idx);
+                    idx = std::get<1>(max_val_and_idx);
+                    spectrogram_points_values.buffer[i] = max_val;
+                    spectrogram_points_indicies.buffer[i][0] = idx;
+                    spectrogram_points_indicies.buffer[i][1] = i;
+
+                    //update the max value
+                    if (max_val > absolute_max_val)
+                    {
+                        absolute_max_val = max_val;
+                    }
+                }
+                
+                data_type threshold = absolute_max_val - peak_detection_threshold;
+                //go through the spectrogram_points and zero out the points below the threshold
+                for (size_t i = 0; i < num_rows; i ++){
+                    if (spectrogram_points_values.buffer[i] <= threshold)
+                    {
+                        spectrogram_points_values.buffer[i] = 0;
+                        spectrogram_points_indicies.buffer[i][0] = 0;
+                        spectrogram_points_indicies.buffer[i][1] = 0;
+                    }
+                }
+                return;
             }
         };
     }

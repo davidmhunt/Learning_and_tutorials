@@ -311,7 +311,7 @@
 
                     //if there are more than 5 samples, print out the last sample from the vector as well
                     if(buffer_to_print.size() > 5){
-                        std::cout << buffer_to_print.back() << std::endl;
+                        std::cout << "...., " << buffer_to_print.back() << std::endl;
                     }
                     else{
                         std::cout << std::endl;
@@ -432,6 +432,45 @@
                     }
                 }
                              
+                void load_data_into_buffer_efficient(std::vector<data_type> & data_to_load, bool copy_until_buffer_full = true){
+
+                    //get the number of samples in the data_to_load
+                    size_t m = data_to_load.size(); //rows
+                    
+                    
+                    //determine the maximum sample number for the initialized array
+                    size_t samples_to_load = num_rows * num_cols;
+
+                    //initialize variables for reshaping
+                    size_t from_idx;
+                    size_t to_r;
+                    size_t to_c;
+
+                    for (size_t i = 0; i < samples_to_load; i++)
+                    {
+                        //index in data_to_load
+                        from_idx = i % m;
+
+                        //indicies in current array
+                        to_r = i/num_cols;
+                        to_c = i % num_cols;
+
+                        if (i >= m)
+                        {
+                            if (copy_until_buffer_full)
+                            {
+                                buffer[to_r][to_c] = data_to_load[from_idx];
+                            }
+                            else{
+                                buffer[to_r][to_c] = 0;
+                            }
+                        }
+                        else{
+                            buffer[to_r][to_c] = data_to_load[from_idx];
+                        }
+                    }
+                }
+                
                 void load_data_into_buffer_efficient(std::vector<std::vector<data_type>> & data_to_load, bool copy_until_buffer_full = true){
 
                     //get dimmensions of data_to_load array
@@ -462,7 +501,7 @@
                         {
                             if (copy_until_buffer_full)
                             {
-                                buffer[to_r][to_c] = data_to_load[from_r - m][from_c];
+                                buffer[to_r][to_c] = data_to_load[from_r % m][from_c];
                             }
                             else{
                                 buffer[to_r][to_c] = 0;
@@ -522,7 +561,7 @@
                         std::vector<data_type> data = Buffer<data_type>::load_data_from_read_file();
                         
                         //load it into the file
-                        load_data_into_buffer(data,false);
+                        load_data_into_buffer_efficient(data,false);
                     }
                     else {
                         std::cout << "Buffer_2D::import_from_file: attempted to import from file when buffer wasn't initialized" <<std::endl;
@@ -551,7 +590,7 @@
                         buffer = std::vector<std::vector<data_type>>(num_rows,std::vector<data_type>(num_cols));
                         
                         //load it into the file
-                        load_data_into_buffer(data,false);
+                        load_data_into_buffer_efficient(data,false);
 
                         return;
                 }
@@ -631,7 +670,8 @@
                  * 
                  */
                 virtual void print_preview() {
-                    //determine whether or not to print the full buffer or a preview of the buffer
+                    
+                    //declare variable to keep track of how many samples to print out (limited to the first 5 and the last sample)
                     size_t samples_to_print;
                     if (buffer.size() > 5){
                         samples_to_print = 5;
@@ -642,25 +682,23 @@
                     }
                     
                     else{
-                        std::cerr << "Buffer_1D::print_preview: buffer to print is empty" << std::endl;
+                        std::cerr << "Buffer_1D::print_1d_buffer_preview: buffer to print is empty" << std::endl;
                         return;
                     }
 
                     //print out the first five samples
                     for (size_t i = 0; i < samples_to_print; i++)
                     {
-                        std::cout << buffer[i].real() << " + " << buffer[i].imag() << "j, ";
+                       std::cout << buffer[i] << ", ";
                     }
 
-                    //if there are more than 5 samples, print out the last sample from the buffer as well
+                    //if there are more than 5 samples, print out the last sample from the vector as well
                     if(buffer.size() > 5){
-                        std::cout << "\t...\t" << buffer.back().real() << " + " <<
-                                buffer.back().imag() << "j" <<std::endl;
+                        std::cout << "...., " << buffer.back() << std::endl;
                     }
                     else{
                         std::cout << std::endl;
                     }
-                    return;
                 }
 
                 /**
