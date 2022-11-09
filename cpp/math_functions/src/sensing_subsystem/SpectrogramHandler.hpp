@@ -59,6 +59,9 @@
             std::vector<data_type> frequencies;
             std::vector<data_type> times;
 
+            //clustering parameters
+            size_t min_points_per_chirp;
+
         
         public:
 
@@ -78,10 +81,14 @@
 
                 //spectrogram points
                 Buffer_1D<data_type> spectrogram_points_values;
+                Buffer_1D<size_t> spectrogram_points_indicies;
 
                 //frequency and timing bins
                 Buffer_1D<data_type> detected_times;
                 Buffer_1D<data_type> detected_frequencies;
+
+                //cluster indicies
+                Buffer_1D<int> cluster_indicies;
             
         public:
 
@@ -98,6 +105,7 @@
                     initialize_buffers();
                     initialize_hanning_window();
                     initialize_freq_and_timing_bins();
+                    initialize_clustering_params();
                 }
                 
                 
@@ -105,6 +113,12 @@
 
             ~SpectrogramHandler() {};
 
+            /**
+             * @brief Check the json config file to make sure all necessary parameters are included
+             * 
+             * @return true - JSON is all good and has required elements
+             * @return false - JSON is missing certain fields
+             */
             bool check_config(){
                 bool config_good = true;
                 //check sampling rate
@@ -127,6 +141,11 @@
 
                 if(config["SensingSubsystemSettings"]["spectogram_peak_detection_threshold_dB"].is_null()){
                     std::cerr << "SpectrogramHandler::check_config: spectogram peak detection threshold not specified" <<std::endl;
+                    config_good = false;
+                }
+
+                if(config["SensingSubsystemSettings"]["min_points_per_chirp"].is_null()){
+                    std::cerr << "SpectrogramHandler::check_config: min number of points per chirp not specified" <<std::endl;
                     config_good = false;
                 }
 
@@ -210,11 +229,13 @@
 
                 //getting the points from the spectrogram
                 spectrogram_points_values = Buffer_1D<data_type>(num_rows_spectrogram);
+                spectrogram_points_indicies = Buffer_1D<size_t>(num_rows_spectrogram);
 
                 //tracking detected times
                 detected_times = Buffer_1D<data_type>(num_rows_spectrogram);
                 detected_frequencies = Buffer_1D<data_type>(num_rows_spectrogram);
 
+                cluster_indicies = Buffer_1D<int>(num_rows_spectrogram);
             }
 
             void initialize_freq_and_timing_bins(){
@@ -247,7 +268,12 @@
                         times[i] = (frequency_sampling_period *
                                     static_cast<data_type>(i)) + detected_time_offset;
                     }
-                    
+            }
+
+            void initialize_clustering_params(){
+
+                // get the minimum number of points per chirp from the JSON file
+                min_points_per_chirp = config["SensingSubsystemSettings"]["min_points_per_chirp"].get<size_t>();
             }
 
 
@@ -407,6 +433,10 @@
                 //variable to track the absolute maximum value detected in the spectrogram
                 data_type absolute_max_val = generated_spectrogram.buffer[0][0];
 
+                //clear the detected times and frequencies buffers
+                detected_times.clear();
+                detected_frequencies.clear();
+
                 //get the maximum_value from each computed_spectrogram
                 for (size_t i = 0; i < num_rows_spectrogram; i++)
                 {
@@ -414,8 +444,7 @@
                     max_val = std::get<0>(max_val_and_idx);
                     idx = std::get<1>(max_val_and_idx);
                     spectrogram_points_values.buffer[i] = max_val;
-                    detected_times.buffer[i] = times[i];
-                    detected_frequencies.buffer[i] = frequencies[idx];
+                    spectrogram_points_indicies.buffer[i] = idx;
 
                     //update the max value
                     if (max_val > absolute_max_val)
@@ -427,14 +456,71 @@
                 data_type threshold = absolute_max_val - peak_detection_threshold;
                 //go through the spectrogram_points and zero out the points below the threshold
                 for (size_t i = 0; i < num_rows_spectrogram; i ++){
-                    if (spectrogram_points_values.buffer[i] <= threshold)
+                    if (spectrogram_points_values.buffer[i] > threshold)
                     {
-                        spectrogram_points_values.buffer[i] = -1;
-                        detected_times.buffer[i] = -1;
-                        detected_frequencies.buffer[i] = -1;
+                        detected_times.push_back(times[i]);
+                        detected_frequencies.push_back(
+                            frequencies[
+                                spectrogram_points_indicies.buffer[i]]);
                     }
                 }
                 return;
+            }
+
+            /**
+             * @brief identify the clusters from the detected times and frequencies
+             * 
+             */
+            void compute_clusters(){
+
+                //declare support variables
+                int chirp = 1;
+                size_t chirp_start_idx = 0;
+                size_t num_points_in_chirp = 1;
+                size_t set_val; // use
+
+                //variable to track the total number of detected points
+                size_t num_detected_points = detected_frequencies.num_samples;
+
+                //go through the points and determine the clusters
+                for (size_t i = 1; i < num_detected_points; i++)
+                {
+                    if ((detected_frequencies.buffer[i] - detected_frequencies.buffer[i-1]) > 0)
+                    {
+                        num_points_in_chirp += 1;
+                    }
+                    else{
+                        if(num_points_in_chirp >= min_points_per_chirp){
+                            cluster_indicies.set_val_at_indicies(chirp,chirp_start_idx,i);
+                            
+                            //start tracking the next chirp
+                            chirp += 1;
+                        }
+                        else{
+                            cluster_indicies.set_val_at_indicies(-1,chirp_start_idx,i);
+                        }
+
+                        //reset support variables for tracking new chirp
+                        chirp_start_idx = i;
+                        num_points_in_chirp = 1;
+                    }
+                }
+
+                //check the last point
+                if (num_points_in_chirp >= min_points_per_chirp)
+                {
+                    cluster_indicies.set_val_at_indicies(chirp,chirp_start_idx,num_detected_points);
+                }
+                else{
+                    cluster_indicies.set_val_at_indicies(-1,chirp_start_idx,num_detected_points);
+                }
+                
+
+                //set the remaining samples in the cluster array to zero
+                for (size_t i = num_detected_points; i < num_rows_spectrogram; i++)
+                {
+                    cluster_indicies.buffer[i] = 0;
+                }
             }
         };
     }

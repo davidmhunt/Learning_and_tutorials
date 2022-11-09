@@ -788,6 +788,41 @@
                     buffer = std::vector<data_type>(num_samps);
                     num_samples = num_samps;
                 }
+
+                /**
+                 * @brief Add an element to the end of the buffer and increment the number of samples
+                 * 
+                 * @param element the element to add
+                 */
+                void push_back(data_type element){
+                    num_samples += 1;
+                    buffer.push_back(element);
+                }
+
+                /**
+                 * @brief Clear the buffer and reset the size to zero
+                 * 
+                 */
+                void clear(){
+                    num_samples = 0;
+                    buffer.clear();
+                }
+
+                /**
+                 * @brief Set the provided indicies in the buffer to the specified value
+                 * 
+                 * @param value the value to set
+                 * @param start_idx start index
+                 * @param end_idx end index
+                 */
+                void set_val_at_indicies(data_type value,size_t start_idx, size_t end_idx){
+                    for (size_t i = start_idx; i < end_idx; i++)
+                    {
+                        buffer[i] = value;
+                    }
+                    
+                }
+
         }; // end Buffer_1D class
     
         /**

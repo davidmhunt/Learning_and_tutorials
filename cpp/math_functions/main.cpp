@@ -78,6 +78,12 @@ int main(int, char**) {
     spectrogram_handler.detected_frequencies.set_write_file(path,true);
     spectrogram_handler.detected_frequencies.save_to_file();
 
+    //compute the clusters
+    spectrogram_handler.compute_clusters();
+    path = "/home/david/Documents/MATLAB_generated/cpp_computed_clusters.bin";
+    spectrogram_handler.cluster_indicies.set_write_file(path,true);
+    spectrogram_handler.cluster_indicies.save_to_file();
+
 
     double runs = 100;
 
@@ -86,8 +92,9 @@ int main(int, char**) {
     {
         energy_detector.check_for_chirp(received_signal.buffer[1]);
         spectrogram_handler.load_and_prepare_for_fft(received_signal.buffer);
-        spectrogram_handler.compute_ffts_multi_threaded(4);
+        spectrogram_handler.compute_ffts();
         spectrogram_handler.detect_peaks_in_spectrogram();
+        spectrogram_handler.compute_clusters();
     }
 
     auto stop = high_resolution_clock::now();
