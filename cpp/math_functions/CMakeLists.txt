@@ -9,6 +9,8 @@ add_subdirectory(src)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
+find_package(nlohmann_json 3.10.5 REQUIRED)
+
 #add support for fftw - a few other things are needed as well
 #find_package(PkgConfig REQUIRED)
 #pkg_search_module(FFTW REQUIRED fftw3 IMPORTED_TARGET)
@@ -20,10 +22,12 @@ find_package(Threads REQUIRED)
 add_executable(math_functions main.cpp)
 
 #perform linking
-target_link_libraries(math_functions PRIVATE BufferHandler)
-target_link_libraries(math_functions PUBLIC Threads::Threads)
-target_link_libraries(math_functions PRIVATE SpectrogramHandler)
-target_link_libraries(math_functions PRIVATE EnergyDetector)
+target_link_libraries(math_functions    PRIVATE BufferHandler
+                                        PRIVATE JSONHandler
+                                        PUBLIC Threads::Threads
+                                        PRIVATE SpectrogramHandler
+                                        PRIVATE EnergyDetector
+                                        PRIVATE nlohmann_json::nlohmann_json)
 
 #include directories
 target_link_directories(math_functions PRIVATE 

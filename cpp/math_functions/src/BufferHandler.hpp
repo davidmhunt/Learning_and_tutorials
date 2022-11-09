@@ -78,7 +78,58 @@
                             write_file_stream -> close();
                         }
                     }
-                    
+                }
+
+                /**
+                 * @brief Copy Constructor
+                 * 
+                 * @param rhs reference to an existing Buffer Object
+                 */
+                Buffer(const Buffer<data_type> & rhs) : read_file(rhs.read_file),
+                                                        write_file(rhs.write_file),
+                                                        read_file_stream(rhs.read_file_stream),
+                                                        write_file_stream(rhs.write_file_stream),
+                                                        debug_status(rhs.debug_status),
+                                                        buffer_init_status(rhs.buffer_init_status)
+                                                        {}
+
+                /**
+                 * @brief Assignment operator support
+                 * 
+                 * @param rhs 
+                 * @return Buffer& 
+                 */
+                Buffer & operator=(const Buffer<data_type> & rhs){
+                    if (this != &rhs){
+                        //update the read and write file names
+                        read_file = rhs.read_file;
+                        write_file = rhs.write_file;
+
+                        //update the debug and buffer init status variables
+                        debug_status = rhs.debug_status;
+                        buffer_init_status = rhs.buffer_init_status;
+
+                        //close the existing read/write file streams if needed
+                        if (read_file_stream.use_count() == 1)
+                        {
+                            if (read_file_stream -> is_open()){
+                                read_file_stream -> close();
+                            }
+                        }
+                        
+                        
+                        if (write_file_stream.use_count() == 1){
+                            if (write_file_stream -> is_open()){
+                                write_file_stream -> close();
+                            }
+                        }
+
+                        //set the new read and write file streams
+                        read_file_stream = rhs.read_file_stream;
+                        write_file_stream = rhs.write_file_stream;
+                    }
+
+                    return *this;
                 }
 
                 //managing and initializing file streams

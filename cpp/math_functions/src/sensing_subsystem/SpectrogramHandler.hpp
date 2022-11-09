@@ -19,8 +19,12 @@
     //including buffer handler
     #include "../BufferHandler.hpp"
 
+    //include the JSON handling capability
+    #include <nlohmann/json.hpp>
+
     using namespace Buffers;
     using namespace pocketfft;
+    using json = nlohmann::json;
 
     namespace SpectrogramHandler_namespace {
 
@@ -29,11 +33,15 @@
         {
         private:
 
+            json config;
+            
             //size parameters
             size_t samples_per_sampling_window;
             size_t fft_size;
-            size_t num_rows;
-            size_t num_samples_per_spectrogram;
+            size_t num_rows_rx_signal; //for the received signal
+            size_t num_rows_spectrogram; //for the reshaped array (in preparation for spectogram)
+            size_t num_samples_rx_signal;
+            size_t num_samples_per_spectrogram; //for the reshaped spectrogram
 
             //fft parameters
             shape_t shape;
@@ -43,10 +51,18 @@
             //peak_detection_parameters
             data_type peak_detection_threshold;
 
+            //frequency and timing variables
+            data_type FMCW_sampling_rate;
+            data_type frequency_resolution;
+            data_type frequency_sampling_period;
+            data_type detected_time_offset;
+            std::vector<data_type> frequencies;
+            std::vector<data_type> times;
+
         
         public:
 
-            //parameters for ffts
+            //buffers used
 
                 //reshaped and window buffer (ready for FFT)
                 Buffer_2D<std::complex<data_type>> reshaped__and_windowed_signal_for_fft;
@@ -62,53 +78,184 @@
 
                 //spectrogram points
                 Buffer_1D<data_type> spectrogram_points_values;
-                Buffer_2D<size_t> spectrogram_points_indicies;
 
-            // detected peaks
-
-            //detected times and frequencies
+                //frequency and timing bins
+                Buffer_1D<data_type> detected_times;
+                Buffer_1D<data_type> detected_frequencies;
             
         public:
 
             /**
-             * @brief Construct a new Spectrogram Handler object
+             * @brief Construct a new Spectrogram Handler object using a config file
              * 
-             * @param num_rows the number of rows for the reshaped signal and the fft computation
-             * @param samples_per_sampling_window  the number of samples in each sampling window
-             * @param fft_size the size of the fft to compute for each sampling window
+             * @param json_config a json object with configuration information 
              */
-            SpectrogramHandler(size_t desired_num_rows, 
-                size_t desired_samples_per_sampling_window,
-                size_t desired_fft_size)
-                : num_rows(desired_num_rows),
-                samples_per_sampling_window(desired_samples_per_sampling_window),
-                fft_size(desired_fft_size),
-                num_samples_per_spectrogram(num_rows * samples_per_sampling_window),
-                shape({fft_size}),
-                stride({sizeof(std::complex<data_type>)}),
-                axes({0}),
-                peak_detection_threshold(7),
-                reshaped__and_windowed_signal_for_fft(num_rows,fft_size),
-                hanning_window(fft_size),
-                computed_fft(num_rows,fft_size),
-                generated_spectrogram(num_rows,fft_size),
-                spectrogram_points_values(num_rows),
-                spectrogram_points_indicies(num_rows,2)
+            SpectrogramHandler(json json_config): config(json_config){
+                if (check_config())
                 {
-
-                    // initialize the hanning window
-                    initialize_hanning_window(fft_size);
-                    
-                return;
+                    initialize_spectrogram_params();
+                    initialize_fft_params();
+                    initialize_buffers();
+                    initialize_hanning_window();
+                    initialize_freq_and_timing_bins();
+                }
+                
+                
             }
+
             ~SpectrogramHandler() {};
+
+            bool check_config(){
+                bool config_good = true;
+                //check sampling rate
+                if(config["USRPSettings"]["Multi-USRP"]["sampling_rate"].is_null()){
+                    std::cerr << "SpectrogramHandler::check_config: no sampling_rate in JSON" <<std::endl;
+                    config_good = false;
+                }
+                
+                //check the samples per buffer
+                if(config["USRPSettings"]["RX"]["spb"].is_null()){
+                    std::cerr << "SpectrogramHandler::check_config: Rx spb not specified" <<std::endl;
+                    config_good = false;
+                }
+
+                //check the minimum recording time
+                if(config["SensingSubsystemSettings"]["min_recording_time_ms"].is_null()){
+                    std::cerr << "SpectrogramHandler::check_config: min recording time not specified" <<std::endl;
+                    config_good = false;
+                }
+
+                if(config["SensingSubsystemSettings"]["spectogram_peak_detection_threshold_dB"].is_null()){
+                    std::cerr << "SpectrogramHandler::check_config: spectogram peak detection threshold not specified" <<std::endl;
+                    config_good = false;
+                }
+
+                return config_good;
+            }
+            
+            /**
+             * @brief Initialize spectrogram parameters based on the configuration file
+             * 
+             */
+            void initialize_spectrogram_params(){
+
+                //specify the sampling rate
+                FMCW_sampling_rate = config["USRPSettings"]["Multi-USRP"]["sampling_rate"].get<data_type>();
+                size_t samples_per_buffer = config["USRPSettings"]["RX"]["spb"].get<size_t>();
+
+                //determine the frequency sampling period based on the sampling rate
+                data_type freq_sampling_period;
+                if (FMCW_sampling_rate > 500e6)
+                {
+                    freq_sampling_period = 0.5e-6;
+                }
+                else{
+                    freq_sampling_period = 2e-6;
+                }
+                
+                //determine the number of samples per sampling window
+                samples_per_sampling_window = static_cast<size_t>(std::ceil(FMCW_sampling_rate * freq_sampling_period));
+
+                //determine the fft size
+                fft_size = static_cast<size_t>(
+                                std::pow(2,std::floor(
+                                    std::log2(static_cast<data_type>(samples_per_sampling_window)))));
+
+                //recompute the actual frequency sampling window using the number of samples 
+                // per sampling window
+                freq_sampling_period = static_cast<data_type>(samples_per_sampling_window) /
+                                            FMCW_sampling_rate;
+                
+                //determine the number of rows in the rx signal buffer
+                data_type row_period = static_cast<data_type>(samples_per_buffer)/FMCW_sampling_rate;
+                data_type min_recording_time_ms = config["SensingSubsystemSettings"]["min_recording_time_ms"].get<data_type>();
+                num_rows_rx_signal = static_cast<size_t>(std::ceil((min_recording_time_ms * 1e-3)/row_period));
+
+                //determine the number of samples per rx signal
+                num_samples_rx_signal = num_rows_rx_signal * samples_per_buffer;
+
+                //determine the number of rows in the spectrogram
+                num_rows_spectrogram = (num_samples_rx_signal / samples_per_sampling_window);
+                num_samples_per_spectrogram = num_rows_spectrogram * samples_per_sampling_window;
+
+                //set the peak detection threshold for the spectogram
+                peak_detection_threshold = config["SensingSubsystemSettings"]["spectogram_peak_detection_threshold_dB"].get<data_type>();
+            }
+
+
+            /**
+             * @brief initialize the parameters needed by the fft computation
+             * 
+             */
+            void initialize_fft_params(){
+                
+                shape = {fft_size};
+                stride = {sizeof(std::complex<data_type>)};
+                axes = {0};
+            }
+
+            /**
+             * @brief initialize all buffers used by the spectrogram handler
+             * 
+             */
+            void initialize_buffers(){
+                reshaped__and_windowed_signal_for_fft = Buffer_2D<std::complex<data_type>>(num_rows_spectrogram,fft_size);
+                
+                //window to apply
+                hanning_window = Buffer_1D<std::complex<data_type>>(fft_size);
+                
+                //fft/spectrogram generation
+                computed_fft = Buffer_2D<std::complex<data_type>>(num_rows_spectrogram,fft_size);
+                generated_spectrogram = Buffer_2D<data_type>(num_rows_spectrogram,fft_size);
+
+                //getting the points from the spectrogram
+                spectrogram_points_values = Buffer_1D<data_type>(num_rows_spectrogram);
+
+                //tracking detected times
+                detected_times = Buffer_1D<data_type>(num_rows_spectrogram);
+                detected_frequencies = Buffer_1D<data_type>(num_rows_spectrogram);
+
+            }
+
+            void initialize_freq_and_timing_bins(){
+                //initialize the frequency parameters and buffers
+                frequency_resolution = FMCW_sampling_rate * 1e-6 /
+                            static_cast<data_type>(fft_size);
+
+                frequencies = std::vector<data_type>(fft_size,0);
+
+                for (size_t i = 0; i < fft_size; i++)
+                {
+                    frequencies[i] = frequency_resolution * static_cast<data_type>(i);
+                }
+
+                //initialize the timing parameters and buffers
+                    //compute the timing offset
+                    frequency_sampling_period = 
+                            static_cast<data_type>(samples_per_sampling_window)/
+                                (FMCW_sampling_rate * 1e-6);
+                    
+                    detected_time_offset = frequency_sampling_period * 
+                                static_cast<data_type>(fft_size) / 2 /
+                                static_cast<data_type>(samples_per_sampling_window);
+                    
+                    //create the times buffer
+                    times = std::vector<data_type>(num_rows_spectrogram,0);
+                
+                    for (size_t i = 0; i < num_rows_spectrogram; i++)
+                    {
+                        times[i] = (frequency_sampling_period *
+                                    static_cast<data_type>(i)) + detected_time_offset;
+                    }
+                    
+            }
+
 
             /**
              * @brief Computes a hanning window of a given size for use in the spectogram generation
              * 
-             * @param fft_size the size of the fft's that will be computed (hanning window is same size)
              */
-            void initialize_hanning_window(size_t fft_size) {
+            void initialize_hanning_window() {
                 data_type M = static_cast<data_type>(fft_size);
                 for (size_t i = 0; i < fft_size; i++)
                 {
@@ -121,14 +268,6 @@
                     hanning_window.buffer[i] = std::complex<data_type>(hann);
                 } 
             }
-        
-            /**
-             * @brief Loads a received signal, reshapes, and prepares it 
-             * for fft processing. Signal is saved in 
-             * reshaped__and_windowed_signal_for_fft buffer
-             * 
-             * @param received_signal a 2D vector of the received signal recorded on the USRP
-             */
 
 
             /**
@@ -151,7 +290,7 @@
                 //initialize variable to determine the coordinate in the received signal for a row/col index in reshpaed signal
                 size_t k;
 
-                for (size_t i = 0; i < num_rows; i++)
+                for (size_t i = 0; i < num_rows_spectrogram; i++)
                 {
                     for (size_t j = 0; j < fft_size; j++)
                     {
@@ -176,10 +315,10 @@
 
             void compute_ffts(size_t start_idx = 0, size_t end_idx = 0){
               
-              //if the end_idx is zero (default condition), set it to be the num_rows
+              //if the end_idx is zero (default condition), set it to be the num_rows_spectrogram
               if (end_idx == 0)
               {
-                end_idx = num_rows;
+                end_idx = num_rows_spectrogram;
               }
               
               
@@ -203,7 +342,7 @@
             void compute_ffts_multi_threaded(size_t num_threads = 1){
                 //initialize a vector of threads
                 std::vector<std::thread> threads;
-                size_t rows_per_thread = num_rows / num_threads;
+                size_t rows_per_thread = num_rows_spectrogram / num_threads;
                 size_t start_row;
                 size_t end_row;
 
@@ -214,7 +353,7 @@
                     start_row = thread_num * rows_per_thread;
 
                     if (thread_num == (num_threads - 1)){
-                        end_row = num_rows;
+                        end_row = num_rows_spectrogram;
                     }
                     else{
                         end_row = (thread_num + 1) * rows_per_thread;
@@ -255,7 +394,8 @@
             }
 
             /**
-             * @brief Detect the peaks in the computed spectrogram
+             * @brief Detect the peaks in the computed spectrogram 
+             * and saves the results in the detected_times and detected_frequenies array
              * 
              */
             void detect_peaks_in_spectrogram(){
@@ -268,14 +408,14 @@
                 data_type absolute_max_val = generated_spectrogram.buffer[0][0];
 
                 //get the maximum_value from each computed_spectrogram
-                for (size_t i = 0; i < num_rows; i++)
+                for (size_t i = 0; i < num_rows_spectrogram; i++)
                 {
                     max_val_and_idx = compute_max_val(generated_spectrogram.buffer[i]);
                     max_val = std::get<0>(max_val_and_idx);
                     idx = std::get<1>(max_val_and_idx);
                     spectrogram_points_values.buffer[i] = max_val;
-                    spectrogram_points_indicies.buffer[i][0] = idx;
-                    spectrogram_points_indicies.buffer[i][1] = i;
+                    detected_times.buffer[i] = times[i];
+                    detected_frequencies.buffer[i] = frequencies[idx];
 
                     //update the max value
                     if (max_val > absolute_max_val)
@@ -286,12 +426,12 @@
                 
                 data_type threshold = absolute_max_val - peak_detection_threshold;
                 //go through the spectrogram_points and zero out the points below the threshold
-                for (size_t i = 0; i < num_rows; i ++){
+                for (size_t i = 0; i < num_rows_spectrogram; i ++){
                     if (spectrogram_points_values.buffer[i] <= threshold)
                     {
-                        spectrogram_points_values.buffer[i] = 0;
-                        spectrogram_points_indicies.buffer[i][0] = 0;
-                        spectrogram_points_indicies.buffer[i][1] = 0;
+                        spectrogram_points_values.buffer[i] = -1;
+                        detected_times.buffer[i] = -1;
+                        detected_frequencies.buffer[i] = -1;
                     }
                 }
                 return;
