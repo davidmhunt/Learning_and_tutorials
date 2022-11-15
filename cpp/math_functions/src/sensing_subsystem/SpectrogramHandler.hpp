@@ -22,9 +22,14 @@
     //include the JSON handling capability
     #include <nlohmann/json.hpp>
 
+    //include the required headers from EIGEN
+    #include "Eigen/Dense"
+
+
     using namespace Buffers;
     using namespace pocketfft;
     using json = nlohmann::json;
+    using namespace Eigen;
 
     namespace SpectrogramHandler_namespace {
 
@@ -39,6 +44,7 @@
             size_t samples_per_sampling_window;
             size_t fft_size;
             size_t num_rows_rx_signal; //for the received signal
+            size_t samples_per_buffer_rx_signal; //the spb for the received signal
             size_t num_rows_spectrogram; //for the reshaped array (in preparation for spectogram)
             size_t num_samples_rx_signal;
             size_t num_samples_per_spectrogram; //for the reshaped spectrogram
@@ -61,11 +67,27 @@
 
             //clustering parameters
             size_t min_points_per_chirp;
+            int max_cluster_index;
+
+            //timing parameters
+            data_type detection_start_time_us;
+            const data_type c = 2.99792458e8;
+            size_t chirp_tracking_num_captured_chirps;
+            data_type chirp_tracking_average_slope; //in MHz/us
+            data_type chirp_tracking_average_chirp_duration; //in us
+            size_t frame_tracking_num_captured_frames;
+            data_type frame_tracking_average_frame_duration;
+            data_type frame_tracking_average_chirp_duration;
+            data_type frame_tracking_average_chirp_slope;
+
 
         
         public:
 
             //buffers used
+
+                //rx signal buffer
+                Buffer_2D<std::complex<data_type>> rx_buffer;
 
                 //reshaped and window buffer (ready for FFT)
                 Buffer_2D<std::complex<data_type>> reshaped__and_windowed_signal_for_fft;
@@ -89,6 +111,13 @@
 
                 //cluster indicies
                 Buffer_1D<int> cluster_indicies;
+
+                //buffers for detected chirps
+                Buffer_1D<data_type> detected_slopes;
+                Buffer_1D<data_type> detected_intercepts;
+
+                //buffer for tracking victim frames
+                Buffer_2D<data_type> captured_frames; //colums as follows: duration, number of chirps, average slope, average chirp duration, start time, next predicted frame start time
             
         public:
 
@@ -106,6 +135,7 @@
                     initialize_hanning_window();
                     initialize_freq_and_timing_bins();
                     initialize_clustering_params();
+                    initialize_chirp_and_frame_tracking();
                 }
                 
                 
@@ -149,6 +179,11 @@
                     config_good = false;
                 }
 
+                if(config["SensingSubsystemSettings"]["num_victim_frames_to_capture"].is_null()){
+                    std::cerr << "SpectrogramHandler::check_config: num_victim_frames_to_capture not specified" <<std::endl;
+                    config_good = false;
+                }
+
                 return config_good;
             }
             
@@ -160,7 +195,7 @@
 
                 //specify the sampling rate
                 FMCW_sampling_rate = config["USRPSettings"]["Multi-USRP"]["sampling_rate"].get<data_type>();
-                size_t samples_per_buffer = config["USRPSettings"]["RX"]["spb"].get<size_t>();
+                samples_per_buffer_rx_signal = config["USRPSettings"]["RX"]["spb"].get<size_t>();
 
                 //determine the frequency sampling period based on the sampling rate
                 data_type freq_sampling_period;
@@ -186,12 +221,12 @@
                                             FMCW_sampling_rate;
                 
                 //determine the number of rows in the rx signal buffer
-                data_type row_period = static_cast<data_type>(samples_per_buffer)/FMCW_sampling_rate;
+                data_type row_period = static_cast<data_type>(samples_per_buffer_rx_signal)/FMCW_sampling_rate;
                 data_type min_recording_time_ms = config["SensingSubsystemSettings"]["min_recording_time_ms"].get<data_type>();
                 num_rows_rx_signal = static_cast<size_t>(std::ceil((min_recording_time_ms * 1e-3)/row_period));
 
                 //determine the number of samples per rx signal
-                num_samples_rx_signal = num_rows_rx_signal * samples_per_buffer;
+                num_samples_rx_signal = num_rows_rx_signal * samples_per_buffer_rx_signal;
 
                 //determine the number of rows in the spectrogram
                 num_rows_spectrogram = (num_samples_rx_signal / samples_per_sampling_window);
@@ -218,6 +253,11 @@
              * 
              */
             void initialize_buffers(){
+                
+                //rx_buffer
+                rx_buffer = Buffer_2D<std::complex<data_type>>(num_rows_rx_signal,samples_per_buffer_rx_signal);
+
+                //reshaped and sampled signal
                 reshaped__and_windowed_signal_for_fft = Buffer_2D<std::complex<data_type>>(num_rows_spectrogram,fft_size);
                 
                 //window to apply
@@ -235,9 +275,23 @@
                 detected_times = Buffer_1D<data_type>(num_rows_spectrogram);
                 detected_frequencies = Buffer_1D<data_type>(num_rows_spectrogram);
 
+                //clustering indicies
                 cluster_indicies = Buffer_1D<int>(num_rows_spectrogram);
+
+                //detected slopes and intercepts
+                detected_slopes = Buffer_1D<data_type>(num_rows_spectrogram);
+                detected_intercepts = Buffer_1D<data_type>(num_rows_spectrogram);
+
+                //captured frames
+                size_t max_frames_to_capture = 
+                    config["SensingSubsystemSettings"]["num_victim_frames_to_capture"].get<size_t>();
+                captured_frames = Buffer_2D<data_type>(max_frames_to_capture,6);
             }
 
+            /**
+             * @brief Initialize the frequency and timing bins
+             * 
+             */
             void initialize_freq_and_timing_bins(){
                 //initialize the frequency parameters and buffers
                 frequency_resolution = FMCW_sampling_rate * 1e-6 /
@@ -270,10 +324,17 @@
                     }
             }
 
+            /**
+             * @brief Initialize the clustering parameters
+             * 
+             */
             void initialize_clustering_params(){
 
                 // get the minimum number of points per chirp from the JSON file
                 min_points_per_chirp = config["SensingSubsystemSettings"]["min_points_per_chirp"].get<size_t>();
+
+                //initialize the maximum cluster index to be zero
+                max_cluster_index = 0;
             }
 
 
@@ -296,18 +357,54 @@
             }
 
 
+            void initialize_chirp_and_frame_tracking(){
+                //chirp tracking
+                chirp_tracking_num_captured_chirps = 0;
+                chirp_tracking_average_slope = 0;
+                chirp_tracking_average_chirp_duration = 0;
+
+                //frame tracking
+                frame_tracking_num_captured_frames = 0;
+                frame_tracking_average_frame_duration = 0;
+                frame_tracking_average_chirp_duration = 0;
+                frame_tracking_average_chirp_slope = 0;
+            }
+
+            /**
+             * @brief Set the detection start time us object
+             * 
+             * @param start_time_us the time that the first sample in the rx_buffer occured at (us)
+             * @param victim_distance_m the range of the victim (m)
+             */
+            void set_detection_start_time_us(data_type start_time_us, data_type victim_distance_m = 0){
+                data_type distance_delay_us = (victim_distance_m / c) * 1e6;
+                detection_start_time_us = start_time_us - distance_delay_us;
+            }
+
+            /**
+             * @brief Process the received signal
+             * 
+             */
+            void process_received_signal(){
+                load_and_prepare_for_fft();
+                compute_ffts();
+                detect_peaks_in_spectrogram();
+                compute_clusters();
+                compute_linear_model();
+                compute_victim_parameters();
+            }
+
             /**
              * @brief Loads a received signal, reshapes, and prepares it 
              * for fft processing. Signal is saved in 
              * reshaped__and_windowed_signal_for_fft buffer
              * 
-             * @param received_signal a 2D vector of the received signal recorded on the USRP
              */
-            void load_and_prepare_for_fft(std::vector<std::vector<std::complex<data_type>>> & received_signal){
+            void load_and_prepare_for_fft(){
                 
-                //get dimmensions of received_signal array
-                size_t m = received_signal.size(); //rows
-                size_t n = received_signal[0].size(); //cols
+                //get dimmensions of rx_buffer array
+                size_t m = rx_buffer.buffer.size(); //rows
+                size_t n = rx_buffer.buffer[0].size(); //cols
 
                 //initialize variables for reshaping
                 size_t from_r;
@@ -320,10 +417,10 @@
                 {
                     for (size_t j = 0; j < fft_size; j++)
                     {
-                        //for a given row,col index in the reshaped signal, determine the coordinate in the received_signal
+                        //for a given row,col index in the reshaped signal, determine the coordinate in the rx_buffer
                         size_t k = i * samples_per_sampling_window + j;
 
-                        //indicies in received_signal
+                        //indicies in rx_buffer
                         from_r = k/n;
                         from_c = k % n;
 
@@ -332,13 +429,22 @@
                             reshaped__and_windowed_signal_for_fft.buffer[i][j] = 0;
                         }
                         else{
-                            reshaped__and_windowed_signal_for_fft.buffer[i][j] = received_signal[from_r][from_c] * hanning_window.buffer[j];
+                            reshaped__and_windowed_signal_for_fft.buffer[i][j] = rx_buffer.buffer[from_r][from_c] * hanning_window.buffer[j];
                         }
                     } 
                 }
                 return;
             }
 
+            /**
+             * @brief Compute the fft for the desired rows in the reshaped and windowed
+             * signal buffer
+             * 
+             * @param start_idx the index of the row in the reshaped_and_windowed_signal buffer
+             * to start computing ffts for
+             * @param end_idx the index of the row in the reshaped_and_windowed_signal buffer to
+             * end computing ffts for
+             */
             void compute_ffts(size_t start_idx = 0, size_t end_idx = 0){
               
               //if the end_idx is zero (default condition), set it to be the num_rows_spectrogram
@@ -365,6 +471,12 @@
                 }
             }
 
+            /**
+             * @brief CURRENTLY BROKEN compute ffts using multiple threads
+             * (calls compute_ffts() from multiple threads)
+             * 
+             * @param num_threads the number of threads to use for FFT computations
+             */
             void compute_ffts_multi_threaded(size_t num_threads = 1){
                 //initialize a vector of threads
                 std::vector<std::thread> threads;
@@ -514,6 +626,9 @@
                 else{
                     cluster_indicies.set_val_at_indicies(-1,chirp_start_idx,num_detected_points);
                 }
+
+                //set the maximum cluster index
+                max_cluster_index = chirp;
                 
 
                 //set the remaining samples in the cluster array to zero
@@ -521,6 +636,127 @@
                 {
                     cluster_indicies.buffer[i] = 0;
                 }
+            }
+
+            /**
+             * @brief Compute the linear model from the clustered times and frequencies
+             * 
+             */
+            void compute_linear_model(){
+
+                //clear the detected slopes and intercepts arrays
+                detected_slopes.clear();
+                detected_intercepts.clear();
+                
+                //initialize the b vector
+                Eigen::Vector<data_type,2> b;
+                size_t n = 0;
+
+                //initialize variables to find indicies for each cluster index
+                std::vector<size_t> indicies;
+                size_t search_start = 0;
+
+
+                for (int i = 1; i <= max_cluster_index; i++)
+                {
+                    indicies = cluster_indicies.find_indicies_with_value(i,search_start,true);
+                    n = indicies.size();
+
+                    //initialize Y and X matricies
+                    Eigen::Matrix<data_type,Dynamic,2> X(n,2);
+                    Eigen::Vector<data_type,Dynamic> Y(n);
+
+                    for (size_t j = 0; j < n; j++)
+                    {
+                        Y(j) = detected_frequencies.buffer[indicies[j]];
+                        X(j,0) = 1;
+                        X(j,1) = detected_times.buffer[indicies[j]];
+                    }
+
+                    //solve the linear equation
+                    b = (X.transpose() * X).ldlt().solve(X.transpose() * Y);
+                    detected_slopes.push_back(b(1));
+                    detected_intercepts.push_back(-b(0)/b(1) + detection_start_time_us);
+                }
+            }
+
+            /**
+             * @brief Compute the victim parameters from the detected signal
+             * 
+             */
+            void compute_victim_parameters(){
+                
+                //determine number of chirps detected
+                chirp_tracking_num_captured_chirps = detected_slopes.num_samples;
+                
+                //compute average chirp slope
+                data_type sum = 0;
+                for (size_t i = 0; i < chirp_tracking_num_captured_chirps; i++)
+                {
+                    sum += detected_slopes.buffer[i];
+                }
+                chirp_tracking_average_slope = sum/
+                        static_cast<data_type>(chirp_tracking_num_captured_chirps);
+
+                //compute average chirp intercept
+                chirp_tracking_average_chirp_duration = 
+                        (detected_intercepts.buffer[chirp_tracking_num_captured_chirps - 1]
+                        - detected_intercepts.buffer[0])
+                        / static_cast<data_type>(chirp_tracking_num_captured_chirps - 1);
+                
+                //increment frame counter
+                frame_tracking_num_captured_frames += 1;
+
+                //save num captured chirps, average slope, average chirp duration, and start time
+                captured_frames.buffer[frame_tracking_num_captured_frames - 1][1] = static_cast<data_type>(chirp_tracking_num_captured_chirps);
+                captured_frames.buffer[frame_tracking_num_captured_frames - 1][2] = chirp_tracking_average_slope;
+                captured_frames.buffer[frame_tracking_num_captured_frames - 1][3] = chirp_tracking_average_chirp_duration;
+                captured_frames.buffer[frame_tracking_num_captured_frames - 1][4] = detected_intercepts.buffer[0]; //time of first chirp
+
+                //TODO: compute precise frame start time
+
+                //compute frame duration, average frame duration, and predict next frame
+                if(frame_tracking_num_captured_frames > 1){
+                    //compute and save frame duration
+                    captured_frames.buffer[frame_tracking_num_captured_frames - 1][0] =
+                        captured_frames.buffer[frame_tracking_num_captured_frames - 1][4]
+                        - captured_frames.buffer[frame_tracking_num_captured_frames - 2][4];
+                    
+                    // compute average frame duration
+                    frame_tracking_average_frame_duration = 
+                        (captured_frames.buffer[frame_tracking_num_captured_frames - 1][4] -
+                        captured_frames.buffer[0][4])
+                        / static_cast<data_type>(frame_tracking_num_captured_frames - 1);
+                    
+                    //predict next frame
+                    captured_frames.buffer[frame_tracking_num_captured_frames - 1][5] = 
+                        captured_frames.buffer[frame_tracking_num_captured_frames - 1][4]
+                        + frame_tracking_average_frame_duration;
+                }
+                else{
+                    captured_frames.buffer[frame_tracking_num_captured_frames - 1][0] = 0;
+                    captured_frames.buffer[frame_tracking_num_captured_frames - 1][5] = 0;
+                }
+
+                //compute average chirp slope across all frames
+                data_type sum_slopes = 0; //sum of all average chirp slopes
+                data_type sum_count = 0; //sum of total number of chirps detected
+                for (size_t i = 0; i < frame_tracking_num_captured_frames; i++)
+                {
+                    sum_slopes += captured_frames.buffer[i][2] * (captured_frames.buffer[i][1] - 1);
+                    sum_count += captured_frames.buffer[i][1] - 1;
+                }
+                frame_tracking_average_chirp_slope = sum_slopes/sum_count;
+                
+                //compute average chirp curation across all frames
+                data_type sum_durations = 0; //sum of all average chirp durations
+                sum_count = 0; //sum of total number of chirps detected
+                for (size_t i = 0; i < frame_tracking_num_captured_frames; i++)
+                {
+                    sum_durations += captured_frames.buffer[i][3] * (captured_frames.buffer[i][1] - 1);
+                    sum_count += captured_frames.buffer[i][1] - 1;
+                }
+                frame_tracking_average_chirp_duration = sum_durations/sum_count;
             }
         };
     }

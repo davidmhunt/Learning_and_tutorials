@@ -823,6 +823,41 @@
                     
                 }
 
+                /**
+                 * @brief find the indicies that have the specific value
+                 * 
+                 * @param value the value to search for
+                 * @param start_idx the index to start the search at (default to zero)
+                 * @param data_sorted boolean, true if data is sorted
+                 * @return std::vector<size_t> vector of indicies that the value is found at
+                 */
+                std::vector<size_t> find_indicies_with_value(data_type value, size_t start_idx = 0, bool data_sorted = true){
+                    
+                    //vector to store the indicies that have the desired value
+                    std::vector<size_t> index_list;
+
+                    //status variables
+                    bool value_found = false;
+                    bool end_search = false;
+
+                    //perform the search
+                    for (size_t i = start_idx; i < num_samples && !end_search; i++)
+                    {   
+                        //start searching until an index with the desired value is found
+                        if (buffer[i] == value)
+                        {
+                            index_list.push_back(i);
+                            value_found = true;
+                        }
+                        //if an index with the value has already been found
+                        else if (value_found && data_sorted)
+                        {
+                            end_search = true;
+                        }
+                    }
+                    return index_list;
+                }
+
         }; // end Buffer_1D class
     
         /**

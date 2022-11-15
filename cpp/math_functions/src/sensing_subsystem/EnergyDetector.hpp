@@ -13,29 +13,36 @@
     #define _USE_MATH_DEFINES
     #include <cmath>
 
+    //include the JSON handling capability
+    #include <nlohmann/json.hpp>
+
+    using json = nlohmann::json;
+
     namespace EnergyDetector_namespace{
         template<typename data_type>
         class EnergyDetector{
             private:
-                data_type relative_noise_power;
-                data_type threshold_level;
-                data_type sampling_frequency;
+                //config object
+                json config;
+
+                //other configuration information
+                data_type relative_noise_power; //dB
+                data_type threshold_level; //dB
+                data_type sampling_frequency; //Hz
             public:
 
             /**
              * @brief Construct a new Energy Detector object
              * 
-             * @param threshold the specified threshold in dB that a received signal
-             * must be greater than the noise level before the sensing subsystem
-             * starts to record samples
-             * 
-             * @param sampling_frequency the sampling frequency (in seconds) that samples
-             * are recorded at
+             * @param json_config JSON configuration object with required information
              */
-            EnergyDetector(data_type samp_freq, data_type threshold):
-                relative_noise_power(0),
-                threshold_level(threshold),
-                sampling_frequency(samp_freq) {};
+            EnergyDetector(json json_config):config(json_config){
+                if (check_config())
+                {
+                    initialize_energy_detector_params();
+                }
+                
+            }
 
             /**
              * @brief Destroy the Energy Detector object
@@ -43,6 +50,39 @@
              */
             ~EnergyDetector () {};
 
+            /**
+             * @brief Check the json config file to make sure all necessary parameters are included
+             * 
+             * @return true - JSON is all good and has required elements
+             * @return false - JSON is missing certain fields
+             */
+            bool check_config(){
+                bool config_good = true;
+                //check sampling rate
+                if(config["USRPSettings"]["Multi-USRP"]["sampling_rate"].is_null()){
+                    std::cerr << "EnergyDetector::check_config: no sampling_rate in JSON" <<std::endl;
+                    config_good = false;
+                }
+
+                if(config["SensingSubsystemSettings"]["energy_detection_threshold_dB"].is_null()){
+                    std::cerr << "EnergyDetector::check_config: energy_detection_threshold_dB not specified" <<std::endl;
+                    config_good = false;
+                }
+
+                return config_good;
+            }
+
+            /**
+             * @brief Initializes all energy detection parameters
+             * 
+             */
+            void initialize_energy_detector_params(){
+                relative_noise_power = 0;
+                threshold_level = 
+                    config["SensingSubsystemSettings"]["energy_detection_threshold_dB"].get<data_type>();
+                sampling_frequency = config["USRPSettings"]["Multi-USRP"]["sampling_rate"].get<data_type>();
+            }
+            
             /**
              * @brief Compute the power of a given rx signal
              * 

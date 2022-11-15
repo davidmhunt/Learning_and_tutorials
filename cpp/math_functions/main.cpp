@@ -21,11 +21,14 @@
 #include "src/sensing_subsystem/EnergyDetector.hpp"
 
 
+//include Eigen test code
+#include"src/sensing_subsystem/Eigen/Dense"
 
 using SpectrogramHandler_namespace::SpectrogramHandler;
 using EnergyDetector_namespace::EnergyDetector;
 using namespace std::chrono;
 using json = nlohmann::json;
+
 
 int main(int, char**) {
     
@@ -36,16 +39,15 @@ int main(int, char**) {
 
     //initialize the spectrogram_handler
     //SpectrogramHandler<float> spectrogram_handler(994,118,64);
-    EnergyDetector<float> energy_detector(5.852e+7,3);
+    EnergyDetector<float> energy_detector(config);
 
     //load a sample received signal to confirm correctness
     std::string path = "/home/david/Documents/MATLAB_generated/MATLAB_received_signal.bin";
-    Buffer_2D<std::complex<float>> received_signal;
-    received_signal.set_read_file(path,true);
-    received_signal.import_from_file(2040);
+    spectrogram_handler.rx_buffer.set_read_file(path,true);
+    spectrogram_handler.rx_buffer.import_from_file(1020);
     
     //compute the relative noise power value
-    energy_detector.compute_relative_noise_power(received_signal.buffer[0]);
+    energy_detector.compute_relative_noise_power(spectrogram_handler.rx_buffer.buffer[0]);
     
     //save the hanning window to a file to confirm correctness
     path = "/home/david/Documents/MATLAB_generated/cpp_hanning_window.bin";
@@ -54,7 +56,7 @@ int main(int, char**) {
     
     //load and reshape the received signal to confirm correctness
     path = "/home/david/Documents/MATLAB_generated/cpp_reshaped_and_windowed_for_fft.bin";
-    spectrogram_handler.load_and_prepare_for_fft(received_signal.buffer);
+    spectrogram_handler.load_and_prepare_for_fft();
     spectrogram_handler.reshaped__and_windowed_signal_for_fft.set_write_file(path,true);
     spectrogram_handler.reshaped__and_windowed_signal_for_fft.save_to_file();
 
@@ -84,17 +86,35 @@ int main(int, char**) {
     spectrogram_handler.cluster_indicies.set_write_file(path,true);
     spectrogram_handler.cluster_indicies.save_to_file();
 
+    //fit linear models
+    spectrogram_handler.compute_linear_model();
+    path = "/home/david/Documents/MATLAB_generated/cpp_detected_slopes.bin";
+    spectrogram_handler.detected_slopes.set_write_file(path,true);
+    spectrogram_handler.detected_slopes.save_to_file();
+    path = "/home/david/Documents/MATLAB_generated/cpp_detected_intercepts.bin";
+    spectrogram_handler.detected_intercepts.set_write_file(path,true);
+    spectrogram_handler.detected_intercepts.save_to_file();
+
+    //compute victim parameters
+    spectrogram_handler.compute_victim_parameters();
+    path = "/home/david/Documents/MATLAB_generated/cpp_captured_frames.bin";
+    spectrogram_handler.captured_frames.set_write_file(path,true);
+    spectrogram_handler.captured_frames.save_to_file();
+
 
     double runs = 100;
 
     auto start = high_resolution_clock::now();
     for (double i = 0; i < runs; i++)
     {
-        energy_detector.check_for_chirp(received_signal.buffer[1]);
-        spectrogram_handler.load_and_prepare_for_fft(received_signal.buffer);
-        spectrogram_handler.compute_ffts();
-        spectrogram_handler.detect_peaks_in_spectrogram();
-        spectrogram_handler.compute_clusters();
+        energy_detector.check_for_chirp(spectrogram_handler.rx_buffer.buffer[1]);
+        //spectrogram_handler.load_and_prepare_for_fft();
+        //spectrogram_handler.compute_ffts();
+        //spectrogram_handler.detect_peaks_in_spectrogram();
+        //spectrogram_handler.compute_clusters();
+        //spectrogram_handler.compute_linear_model();
+        //spectrogram_handler.compute_victim_parameters();
+        spectrogram_handler.process_received_signal();
     }
 
     auto stop = high_resolution_clock::now();

@@ -1,0 +1,178 @@
+{
+	"artifacts" : 
+	[
+		{
+			"path" : "math_functions"
+		}
+	],
+	"backtrace" : 1,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_executable",
+			"target_link_directories",
+			"target_link_libraries"
+		],
+		"files" : 
+		[
+			"CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 22,
+				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 33,
+				"parent" : 0
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 25,
+				"parent" : 0
+			}
+		]
+	},
+	"compileGroups" : 
+	[
+		{
+			"compileCommandFragments" : 
+			[
+				{
+					"fragment" : "-g"
+				}
+			],
+			"language" : "CXX",
+			"sourceIndexes" : 
+			[
+				0
+			]
+		}
+	],
+	"dependencies" : 
+	[
+		{
+			"backtrace" : 3,
+			"id" : "BufferHandler::@145eef247bfb46b6828c"
+		},
+		{
+			"backtrace" : 3,
+			"id" : "JSONHandler::@145eef247bfb46b6828c"
+		},
+		{
+			"backtrace" : 3,
+			"id" : "SpectrogramHandler::@01d34e5cd927510fcdc2"
+		},
+		{
+			"backtrace" : 3,
+			"id" : "EnergyDetector::@01d34e5cd927510fcdc2"
+		}
+	],
+	"id" : "math_functions::@6890427a1f51a3e7e1df",
+	"link" : 
+	{
+		"commandFragments" : 
+		[
+			{
+				"fragment" : "-g",
+				"role" : "flags"
+			},
+			{
+				"fragment" : "-rdynamic",
+				"role" : "flags"
+			},
+			{
+				"backtrace" : 2,
+				"fragment" : "-L/home/david/Documents/Learning_and_tutorials/cpp/math_functions/build",
+				"role" : "libraryPath"
+			},
+			{
+				"backtrace" : 2,
+				"fragment" : "-L/home/david/Documents/Learning_and_tutorials/cpp/math_functions/build/src",
+				"role" : "libraryPath"
+			},
+			{
+				"backtrace" : 2,
+				"fragment" : "-L/home/david/Documents/Learning_and_tutorials/cpp/math_functions/build/src/sensing_subsystem",
+				"role" : "libraryPath"
+			},
+			{
+				"backtrace" : 2,
+				"fragment" : "-L/home/david/Documents/Learning_and_tutorials/cpp/math_functions/build/src/sensing_subsystem/pocketfft",
+				"role" : "libraryPath"
+			},
+			{
+				"backtrace" : 2,
+				"fragment" : "-L/home/david/Documents/Learning_and_tutorials/cpp/math_functions/build/src/sensing_subsystem/Eigen",
+				"role" : "libraryPath"
+			},
+			{
+				"fragment" : "-Wl,-rpath,/home/david/Documents/Learning_and_tutorials/cpp/math_functions/build:/home/david/Documents/Learning_and_tutorials/cpp/math_functions/build/src:/home/david/Documents/Learning_and_tutorials/cpp/math_functions/build/src/sensing_subsystem:/home/david/Documents/Learning_and_tutorials/cpp/math_functions/build/src/sensing_subsystem/pocketfft:/home/david/Documents/Learning_and_tutorials/cpp/math_functions/build/src/sensing_subsystem/Eigen",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 3,
+				"fragment" : "src/libBufferHandler.a",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 3,
+				"fragment" : "src/libJSONHandler.a",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 3,
+				"fragment" : "src/sensing_subsystem/libSpectrogramHandler.a",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 3,
+				"fragment" : "src/sensing_subsystem/libEnergyDetector.a",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 3,
+				"fragment" : "src/libBufferHandler.a",
+				"role" : "libraries"
+			}
+		],
+		"language" : "CXX"
+	},
+	"name" : "math_functions",
+	"nameOnDisk" : "math_functions",
+	"paths" : 
+	{
+		"build" : ".",
+		"source" : "."
+	},
+	"sourceGroups" : 
+	[
+		{
+			"name" : "Source Files",
+			"sourceIndexes" : 
+			[
+				0
+			]
+		}
+	],
+	"sources" : 
+	[
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "main.cpp",
+			"sourceGroupIndex" : 0
+		}
+	],
+	"type" : "EXECUTABLE"
+}

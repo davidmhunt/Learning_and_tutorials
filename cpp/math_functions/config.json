@@ -44,9 +44,11 @@
     "SensingSubsystemSettings":{
         "rx_file_name":"/home/david/Documents/MATLAB_generated/sensing_stream.bin",
         "rx_time_ms": 1000,
+        "energy_detection_threshold_dB":3,
         "min_recording_time_ms": 2,
         "spectogram_peak_detection_threshold_dB": 7,
-        "min_points_per_chirp": 5
+        "min_points_per_chirp": 5,
+        "num_victim_frames_to_capture": 128
     },
     "AttackSubsystemSettings":{
         "tx_file_name": "/home/david/Documents/MATLAB_generated/attacking_chirps_full.bin",

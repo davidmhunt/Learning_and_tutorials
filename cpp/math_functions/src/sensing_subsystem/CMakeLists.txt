@@ -11,9 +11,11 @@ add_library(EnergyDetector EnergyDetector.cpp)
 target_link_libraries(SpectrogramHandler    PRIVATE Threads::Threads
                                             PRIVATE BufferHandler
                                             PRIVATE nlohmann_json::nlohmann_json)
+target_link_libraries(EnergyDetector        PRIVATE nlohmann_json::nlohmann_json)
 
 #include directories
 target_link_directories(SpectrogramHandler PRIVATE 
                         ${WORKING_DIRECTORY}/pocketfft
+                        ${WORKING_DIRECTORY}/Eigen
                         ${PARENT_DIRECTORY}
                         )

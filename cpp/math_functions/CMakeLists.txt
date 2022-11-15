@@ -35,6 +35,7 @@ target_link_directories(math_functions PRIVATE
                         ${PROJECT_BINARY_DIR}/src
                         ${PROJECT_BINARY_DIR}/src/sensing_subsystem
                         ${PROJECT_BINARY_DIR}/src/sensing_subsystem/pocketfft
+                        ${PROJECT_BINARY_DIR}/src/sensing_subsystem/Eigen
                         )
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
